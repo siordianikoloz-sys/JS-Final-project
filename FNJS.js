@@ -1,73 +1,77 @@
 async function fetchWeather() {
-  const input = document.getElementById("search");
+  // Get input value and select weather display section
+  let searchInput = document.getElementById("search").value;
   const weatherDataSection = document.getElementById("weather-data");
-  const searchInput = input.value.trim();
+  weatherDataSection.style.display = "block";
 
-  // დასუფთავება
-  weatherDataSection.style.display = "none";
-  weatherDataSection.innerHTML = "";
+  const apiKey = "22cccc1fb9c7d50218828bffe6409d61"; 
 
-  // Empty input
-  if (searchInput === "") {
-    weatherDataSection.style.display = "block";
+  
+  if (searchInput == "") {
     weatherDataSection.innerHTML = `
       <div>
-        <h2>❗ Empty Input!</h2>
-        <p>Please type a city name.</p>
+        <h2>Empty Input!</h2>
+        <p>Please try again with a valid <u>city name</u>.</p>
       </div>
     `;
     return;
   }
 
-  // ---------- Inner functions mimic API ----------
+  // Function to get longitude and latitude from GeoCoding API
   async function getLonAndLat() {
-    // უბრალოდ დUMMY data
-    const fixedCities = ["Kutaisi", "Berlin", "New York", "Warsaw"];
-    if (!fixedCities.includes(searchInput)) return null;
-    return { name: searchInput };
+    const countryCode = 1; 
+    const geocodeURL = `https://api.openweathermap.org/geo/1.0/direct?q=${searchInput.replace(" ", "%20")},${countryCode}&limit=1&appid=${apiKey}`;
+
+    const response = await fetch(geocodeURL);
+    if (!response.ok) {
+      console.log("Bad response! ", response.status);
+      return;
+    }
+
+    const data = await response.json();
+
+    if (data.length == 0) {
+      console.log("Something went wrong here.");
+      weatherDataSection.innerHTML = `
+        <div>
+          <h2>Invalid Input: "${searchInput}"</h2>
+          <p>Please try again with a valid <u>city name</u>.</p>
+        </div>
+      `;
+      return;
+    } else {
+      return data[0];
+    }
   }
 
-  async function getWeatherData(cityObj) {
-    const temps = {
-      Kutaisi: 15,
-      Berlin: 3,
-      "New York": 21,
-      Warsaw: -10
-    };
-    return { 
-      name: cityObj.name, 
-      main: { temp: temps[cityObj.name] }, 
-      weather: [{ description: "Sunny", icon: "01d" }] 
-    };
-  }
+  // Function to get weather data using longitude and latitude
+  async function getWeatherData(lon, lat) {
+    const weatherURL = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}`;
 
-  // ---------- Main flow ----------
-  const geo = await getLonAndLat();
+    const response = await fetch(weatherURL);
+    if (!response.ok) {
+      console.log("Bad response! ", response.status);
+      return;
+    }
 
-  if (!geo) {
-    weatherDataSection.style.display = "block";
+    const data = await response.json();
+
+    // Display weather data with icon and info
+    weatherDataSection.style.display = "flex";
     weatherDataSection.innerHTML = `
+      <img src="https://openweathermap.org/img/wn/${data.weather[0].icon}.png" alt="${data.weather[0].description}" width="100" />
       <div>
-        <h2>❌ City not supported</h2>
-        <p>Try one of: Kutaisi, Berlin, New York, Warsaw</p>
+        <h2>${data.name}</h2>
+        <p><strong>Temperature:</strong> ${Math.round(data.main.temp - 273.15)}°C</p>
+        <p><strong>Description:</strong> ${data.weather[0].description}</p>
       </div>
     `;
-    return;
   }
 
-  const weather = await getWeatherData(geo);
-
-  // ---------- Display ----------
-  weatherDataSection.style.display = "flex";
-  weatherDataSection.innerHTML = `
-    <img src="https://openweathermap.org/img/wn/${weather.weather[0].icon}.png" 
-         alt="${weather.weather[0].description}" width="100" />
-    <div>
-      <h2>${weather.name}</h2>
-      <p><strong>Temperature:</strong> ${weather.main.temp}°C</p>
-      <p><strong>Description:</strong> ${weather.weather[0].description}</p>
-    </div>
-  `;
-
-  input.value = "";
+  // Clear input, get coordinates, and fetch weather
+  document.getElementById("search").value = "";
+  const geocodeData = await getLonAndLat();
+  if (geocodeData) {
+    getWeatherData(geocodeData.lon, geocodeData.lat);
+  }
 }
